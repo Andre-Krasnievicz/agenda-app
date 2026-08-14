@@ -53,24 +53,18 @@ para me passar as credenciais e eu continuo):
 
 2. **Deploy (Vercel)**
    - Conecte este repositório em [vercel.com/new](https://vercel.com/new).
-   - Configure as variáveis de ambiente do projeto na Vercel:
+   - Configure a variável de ambiente do projeto na Vercel:
      - `DATABASE_URL` — a connection string do Neon.
-     - `ACCESS_KEY` — uma senha à sua escolha (ver proteção de acesso abaixo).
    - `TZ` não precisa ser configurada na Vercel: a Vercel já roda em UTC por
      padrão (ver armadilha 7 do plano).
    - Deploy.
 
-3. **Proteção de acesso (seção 11.1 do plano — não pule)**
-   O MVP ainda não tem login, mas guarda nome, telefone e observações
-   clínicas de pacientes reais. Este repo já vem com a opção B do plano
-   pronta: um `middleware.ts` que exige um cookie de acesso.
-   - Defina `ACCESS_KEY` (um valor difícil de adivinhar) nas env vars da Vercel.
-   - Acesse `https://seu-app.vercel.app/entrar?k=<ACCESS_KEY>` uma vez — isso
-     grava um cookie de 1 ano — e só compartilhe esse link com ela.
-   - Alternativa mais forte: ative também o **Vercel Deployment Protection**
-     (Project Settings → Deployment Protection) direto no painel da Vercel.
+   > Sem autenticação por enquanto (decisão explícita, fora do MVP — seção
+   > 11.2 do plano). Se em algum momento quiser uma proteção provisória
+   > enquanto o better-auth não entra, a seção 11.1 do plano descreve duas
+   > opções simples (Vercel Deployment Protection ou um cookie de acesso).
 
-4. **Depois do deploy**
+3. **Depois do deploy**
    - Rode o seed de exemplo só se quiser dados de demonstração —
      **não rode `npm run db:seed` contra o banco de produção depois que ela
      começar a usar de verdade**: o seed apaga tudo antes de recriar.
