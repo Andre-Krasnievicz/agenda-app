@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Patient {
+  id        String   @id @default(cuid())
+  ownerId   String   @default("owner-default")
+  name      String
+  phone     String?
+  notes     String? // observações gerais/clínicas do paciente
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  packages     Package[]
+  appointments Appointment[]
+
+  @@index([ownerId, name])
+}
+
+model Package {
+  id        String  @id @default(cuid())
+  ownerId   String  @default("owner-default")
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  label         String? // ex.: "Pacote 10 sessões - joelho direito"
+  totalSessions Int
+  priceCents    Int // valor do pacote inteiro, em centavos
+  purchasedAt   DateTime      @default(now())
+  status        PackageStatus @default(ACTIVE)
+  notes         String?
+
+  appointments Appointment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([patientId, status])
+}
+
+enum PackageStatus {
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
+model Appointment {
+  id      String @id @default(cuid())
+  ownerId String @default("owner-default")
+
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  packageId String?
+  package   Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  startsAt        DateTime // sempre UTC
+  endsAt          DateTime // sempre UTC (derivado da duração)
+  status          AppointmentStatus @default(SCHEDULED)
+  consumesSession Boolean           @default(true) // derivado do status, ver 4.1
+  notes           String? // observação daquela sessão específica
+
+  seriesId String? // agrupa agendamentos criados por recorrência
+
+  rescheduledFromId String?      @unique
+  rescheduledFrom   Appointment? @relation("Reschedule", fields: [rescheduledFromId], references: [id])
+  rescheduledTo     Appointment? @relation("Reschedule")
+
+  canceledAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([ownerId, startsAt])
+  @@index([packageId, startsAt])
+  @@index([seriesId])
+}
+
+enum AppointmentStatus {
+  SCHEDULED // marcado, ainda vai acontecer
+  COMPLETED // realizado
+  CANCELED_COUNTED // paciente faltou/cancelou e a sessão foi cobrada mesmo assim
+  CANCELED_FREE // cancelado sem consumir sessão (devolve ao pacote)
+  RESCHEDULED // foi movido para outra data; a nova ocorrência é outro registro
+}

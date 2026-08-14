@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: agenda-fisio-db
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+      PGTZ: UTC
+      POSTGRES_USER: agenda
+      POSTGRES_PASSWORD: agenda
+      POSTGRES_DB: agenda_fisio
+    ports:
+      - "5432:5432"
+    volumes:
+      - agenda_fisio_db_data:/var/lib/postgresql/data
+
+volumes:
+  agenda_fisio_db_data:
