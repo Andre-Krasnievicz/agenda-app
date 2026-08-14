@@ -3,13 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import type { CreatePackageInput, UpdatePackageInput } from "@/server/validation/package";
 
+// Sem `disponiveis` aqui de propósito: esse número depende de `totalSessions`,
+// que só o Package conhece. Calculá-lo neste tipo já convidou a um bug (ver
+// git blame) — quem quiser o pacote completo usa `withDisponiveis`/`attachCounters`.
 export type PackageCounters = {
   consumidas: number;
   reservadas: number;
-  disponiveis: number;
 };
 
-export type PackageWithCounters = Package & PackageCounters;
+export type PackageWithCounters = Package & PackageCounters & { disponiveis: number };
 
 /**
  * Contadores do pacote — regra 4.1. Único lugar que calcula isso; se
@@ -27,7 +29,7 @@ export async function getPackageCounters(
       where: { packageId, status: "SCHEDULED" },
     }),
   ]);
-  return { consumidas, reservadas, disponiveis: 0 };
+  return { consumidas, reservadas };
 }
 
 export function withDisponiveis(pkg: Package, counters: PackageCounters): PackageWithCounters {
