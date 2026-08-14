@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -18,8 +18,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { PatientCombobox } from "@/components/patient/PatientCombobox";
 import { NewPatientInlineForm } from "@/components/patient/NewPatientInlineForm";
+import { RecurrenceFields } from "./RecurrenceFields";
 import { DURATION_CHIPS, DEFAULT_DURATION_MINUTES, MAX_DURATION_MINUTES } from "@/config/calendar";
 import { localDateTimeToUtc, toLocalHHmm } from "@/lib/time";
 import { format } from "date-fns";
@@ -106,6 +108,7 @@ function AppointmentFormBody({
   const [showNewPackage, setShowNewPackage] = useState(false);
   const [newPackageSessions, setNewPackageSessions] = useState("10");
   const [newPackagePrice, setNewPackagePrice] = useState("");
+  const [repeat, setRepeat] = useState(false);
 
   const editStart = editingAppointment ? new Date(editingAppointment.startsAt) : undefined;
 
@@ -150,6 +153,13 @@ function AppointmentFormBody({
     selectedPatient?.activePackage && !activePackages.some((p) => p.id === selectedPatient.activePackage!.id)
       ? [selectedPatient.activePackage, ...activePackages]
       : activePackages;
+
+  // useWatch (não o método watch()) — é a forma compatível com o React Compiler,
+  // sem cair no aviso "incompatible library" e sem re-render fora do controle do React.
+  const [watchedDate, watchedTime, watchedDuration, watchedNotes] = useWatch({
+    control,
+    name: ["date", "time", "durationMinutes", "notes"],
+  });
 
   function submit(values: FormValues, allowOverlap = false) {
     const startsAt = localDateTimeToUtc(new Date(`${values.date}T00:00:00`), values.time);
@@ -369,6 +379,29 @@ function AppointmentFormBody({
         <Textarea id="appt-notes" rows={2} {...register("notes")} />
       </div>
 
+      {!editingAppointment && selectedPatient && (
+        <div className="space-y-3">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-ink">Repetir</span>
+            <Switch checked={repeat} onCheckedChange={setRepeat} />
+          </label>
+          {repeat && (
+            <RecurrenceFields
+              patientId={selectedPatient.id}
+              packageId={packageId === NO_PACKAGE ? null : packageId}
+              packageDisponiveis={
+                packageId !== NO_PACKAGE ? (packageOptions.find((p) => p.id === packageId)?.disponiveis ?? null) : null
+              }
+              date={watchedDate}
+              time={watchedTime}
+              durationMinutes={watchedDuration}
+              notes={watchedNotes}
+              onDone={onDone}
+            />
+          )}
+        </div>
+      )}
+
       {conflict && (
         <div className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm">
           <p className="text-ink">
@@ -386,23 +419,32 @@ function AppointmentFormBody({
         </div>
       )}
 
-      <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button
-          type="submit"
-          disabled={editingAppointment ? updateAppointment.isPending : createAppointment.isPending || !selectedPatient}
-        >
-          {editingAppointment
-            ? updateAppointment.isPending
-              ? "Salvando…"
-              : "Salvar alterações"
-            : createAppointment.isPending
-              ? "Salvando…"
-              : "Agendar"}
-        </Button>
-      </DialogFooter>
+      {!repeat && (
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onDone}>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={editingAppointment ? updateAppointment.isPending : createAppointment.isPending || !selectedPatient}
+          >
+            {editingAppointment
+              ? updateAppointment.isPending
+                ? "Salvando…"
+                : "Salvar alterações"
+              : createAppointment.isPending
+                ? "Salvando…"
+                : "Agendar"}
+          </Button>
+        </DialogFooter>
+      )}
+      {repeat && (
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onDone}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      )}
     </form>
   );
 }

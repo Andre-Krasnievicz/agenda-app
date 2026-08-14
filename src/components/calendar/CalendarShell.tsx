@@ -2,15 +2,20 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { addDays, format } from "date-fns";
+import { addDays, addWeeks, format, startOfWeek } from "date-fns";
 import { Plus } from "lucide-react";
 import { CalendarHeader } from "./CalendarHeader";
 import { DayGrid } from "./DayGrid";
+import { WeekGrid } from "./WeekGrid";
 import { Button } from "@/components/ui/button";
 import { AppointmentFormDialog } from "@/components/appointment/AppointmentFormDialog";
 import { AppointmentDetailsDialog } from "@/components/appointment/AppointmentDetailsDialog";
 import { useAppointmentsQuery } from "@/hooks/use-appointments";
-import { localDayRange, todayLocal } from "@/lib/time";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { localDayRange, localWeekRange, todayLocal } from "@/lib/time";
+import { WEEK_STARTS_ON } from "@/config/calendar";
+
+type View = "day" | "week";
 
 function parseDateKey(key: string | null): Date | null {
   if (!key) return null;
@@ -30,20 +35,30 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // No mobile o toggle some e a visão Dia é forçada (seção 7.1) — nunca renderiza
+  // a semana inteira espremida numa tela de 360px.
+  const isDesktop = useMediaQuery("(min-width: 640px)");
+
   const today = useMemo(() => todayLocal(), []);
   const selected = useMemo(() => parseDateKey(searchParams.get("date")) ?? today, [searchParams, today]);
+  const requestedView: View = searchParams.get("view") === "week" ? "week" : "day";
+  const view: View = isDesktop ? requestedView : "day";
 
   const navigate = useCallback(
-    (next: Date) => {
+    (next: Date, nextView: View = view) => {
       const params = new URLSearchParams(searchParams.toString());
       params.set("date", format(next, "yyyy-MM-dd"));
-      if (!params.get("view")) params.set("view", "day");
+      params.set("view", nextView);
       router.push(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [router, pathname, searchParams],
+    [router, pathname, searchParams, view],
   );
 
-  const range = useMemo(() => localDayRange(selected), [selected]);
+  const weekStart = useMemo(() => startOfWeek(selected, { weekStartsOn: WEEK_STARTS_ON }), [selected]);
+  const range = useMemo(
+    () => (view === "week" ? localWeekRange(selected) : localDayRange(selected)),
+    [selected, view],
+  );
   const { data: appointments, isError, refetch } = useAppointmentsQuery(range);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -61,9 +76,10 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
     <div className="flex h-[calc(100vh-0px)] flex-col bg-bg">
       <CalendarHeader
         date={selected}
-        view="day"
-        onPrev={() => navigate(addDays(selected, -1))}
-        onNext={() => navigate(addDays(selected, 1))}
+        view={view}
+        onViewChange={isDesktop ? (v) => navigate(selected, v) : undefined}
+        onPrev={() => navigate(view === "week" ? addWeeks(selected, -1) : addDays(selected, -1))}
+        onNext={() => navigate(view === "week" ? addWeeks(selected, 1) : addDays(selected, 1))}
         onToday={() => navigate(today)}
         rightSlot={
           rightSlot ?? (
@@ -77,13 +93,17 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
       {isError ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p className="text-ink-muted">Não foi possível carregar a agenda.</p>
-          <button
-            onClick={() => refetch()}
-            className="text-sm font-medium text-primary underline underline-offset-4"
-          >
+          <button onClick={() => refetch()} className="text-sm font-medium text-primary underline underline-offset-4">
             Tentar de novo
           </button>
         </div>
+      ) : view === "week" ? (
+        <WeekGrid
+          weekStart={weekStart}
+          appointments={appointments ?? []}
+          today={today}
+          onAppointmentClick={setDetailsId}
+        />
       ) : (
         <DayGrid
           localDay={selected}

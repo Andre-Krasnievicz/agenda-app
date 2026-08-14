@@ -49,6 +49,11 @@ export const allowOverlapQuerySchema = z
   .optional()
   .transform((v) => v === "true");
 
+// `startDate`/`untilDate` chegam como "YYYY-MM-DD" (data de calendário local, não instante) e
+// são parseadas manualmente no service via `new Date(y, m-1, d)` — nunca `z.coerce.date()` aqui:
+// `new Date("2026-03-12")` vira meia-noite UTC, a armadilha #1 da seção 12 do plano.
+const localDateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.");
+
 export const seriesSchema = z
   .object({
     patientId: z.string().min(1),
@@ -56,9 +61,9 @@ export const seriesSchema = z
     weekdays: z.array(z.number().int().min(0).max(6)).min(1),
     time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido."),
     durationMinutes: durationSchema,
-    startDate: z.coerce.date(),
+    startDate: localDateKeySchema,
     count: z.number().int().positive().max(200).optional(),
-    untilDate: z.coerce.date().optional(),
+    untilDate: localDateKeySchema.optional(),
     notes: z.string().trim().max(2000).optional().nullable(),
     allowOverlap: z.boolean().optional().default(false),
   })
@@ -66,3 +71,9 @@ export const seriesSchema = z
     message: "Informe `count` ou `untilDate`.",
   });
 export type SeriesInput = z.infer<typeof seriesSchema>;
+
+/** "YYYY-MM-DD" -> data de calendário local (Y/M/D via getters de sistema, hora zerada). */
+export function parseLocalDateKey(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
