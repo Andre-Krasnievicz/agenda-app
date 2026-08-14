@@ -7,6 +7,27 @@ import type { AppointmentStatus, PackageStatus } from "@prisma/client";
 
 export type { AppointmentStatus, PackageStatus };
 
+export type PackageDTO = {
+  id: string;
+  patientId?: string;
+  label: string | null;
+  totalSessions: number;
+  priceCents: number;
+  status?: PackageStatus;
+  consumidas: number;
+  reservadas: number;
+  disponiveis: number;
+};
+
+export type PatientDTO = {
+  id: string;
+  name: string;
+  phone: string | null;
+  notes: string | null;
+  active: boolean;
+  activePackage: PackageDTO | null;
+};
+
 export type AppointmentDTO = {
   id: string;
   startsAt: string; // ISO UTC

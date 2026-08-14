@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { addDays, format } from "date-fns";
+import { Plus } from "lucide-react";
 import { CalendarHeader } from "./CalendarHeader";
 import { DayGrid } from "./DayGrid";
+import { Button } from "@/components/ui/button";
+import { AppointmentFormDialog } from "@/components/appointment/AppointmentFormDialog";
 import { useAppointmentsQuery } from "@/hooks/use-appointments";
 import { localDayRange, todayLocal } from "@/lib/time";
 
@@ -42,6 +45,14 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
   const range = useMemo(() => localDayRange(selected), [selected]);
   const { data: appointments, isError, refetch } = useAppointmentsQuery(range);
 
+  const [formOpen, setFormOpen] = useState(false);
+  const [slotStartsAt, setSlotStartsAt] = useState<Date | undefined>(undefined);
+
+  function openNewAppointment(startsAt?: Date) {
+    setSlotStartsAt(startsAt);
+    setFormOpen(true);
+  }
+
   return (
     <div className="flex h-[calc(100vh-0px)] flex-col bg-bg">
       <CalendarHeader
@@ -50,7 +61,14 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
         onPrev={() => navigate(addDays(selected, -1))}
         onNext={() => navigate(addDays(selected, 1))}
         onToday={() => navigate(today)}
-        rightSlot={rightSlot}
+        rightSlot={
+          rightSlot ?? (
+            <Button size="sm" onClick={() => openNewAppointment()}>
+              <Plus className="size-4" />
+              Novo agendamento
+            </Button>
+          )
+        }
       />
       {isError ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
@@ -63,8 +81,20 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
           </button>
         </div>
       ) : (
-        <DayGrid localDay={selected} appointments={appointments ?? []} isToday={isSameLocalDay(selected, today)} />
+        <DayGrid
+          localDay={selected}
+          appointments={appointments ?? []}
+          isToday={isSameLocalDay(selected, today)}
+          onSlotClick={openNewAppointment}
+        />
       )}
+
+      <AppointmentFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        initialStartsAt={slotStartsAt}
+        defaultLocalDay={selected}
+      />
     </div>
   );
 }
