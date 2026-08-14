@@ -28,24 +28,29 @@ export const toLocal = (utcDate: Date | string): Date => toZonedTime(utcDate, AP
 export type DateRange = { from: Date; to: Date };
 
 /**
- * Intervalo [00:00, 00:00 do dia seguinte) do dia local que contém `day`,
- * já convertido para UTC. Semiaberto de propósito: um agendamento às
- * 23:59:30 não pode desaparecer por causa de um corte em 23:59:59.
+ * `day` aqui é uma DATA DE CALENDÁRIO LOCAL, não um instante: seus getters
+ * "de parede" (getFullYear/getMonth/getDate) já devem representar o dia
+ * desejado em America/Cuiaba. Construa-a com `todayLocal()` (hoje) ou
+ * `new Date(ano, mesIndex0, dia)` (dia escolhido pela usuária) — nunca passe
+ * aqui um instante UTC cru (ex.: `new Date()` direto, ou o `startsAt` de um
+ * agendamento) sem antes convertê-lo com `toLocal()`, senão o dia sai errado
+ * perto da virada da meia-noite (a mesma armadilha da seção 6).
  */
 export const localDayRange = (day: Date): DateRange => {
-  const localStart = startOfDay(toLocal(day));
+  const localStart = startOfDay(day);
   const localEnd = addDays(localStart, 1);
   return { from: toUtc(localStart), to: toUtc(localEnd) };
 };
 
-/**
- * Intervalo semiaberto da semana local (começando na segunda) que contém `day`.
- */
+/** Intervalo semiaberto da semana de calendário local (começando na segunda) que contém `day`. Mesma regra do `day` acima. */
 export const localWeekRange = (day: Date): DateRange => {
-  const localStart = startOfWeek(toLocal(day), { weekStartsOn: 1 });
+  const localStart = startOfWeek(day, { weekStartsOn: 1 });
   const localEnd = addDays(localStart, 7);
   return { from: toUtc(localStart), to: toUtc(localEnd) };
 };
+
+/** "Hoje" como data de calendário local (Y/M/D em America/Cuiaba, hora zerada) — a ponte entre "instante agora" e o espaço de datas de calendário que `localDayRange`/`localWeekRange` esperam. */
+export const todayLocal = (): Date => startOfDay(toLocal(new Date()));
 
 /**
  * Minutos desde a meia-noite LOCAL (America/Cuiaba) de um instante UTC.

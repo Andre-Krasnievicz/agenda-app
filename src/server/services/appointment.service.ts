@@ -9,6 +9,9 @@ import type {
   RescheduleAppointmentInput,
   UpdateAppointmentInput,
 } from "@/server/validation/appointment";
+import type { AppointmentDTO } from "@/lib/types";
+
+export type { AppointmentDTO };
 
 type TxOrClient = Prisma.TransactionClient | typeof prisma;
 
@@ -108,28 +111,6 @@ async function computeSessionNumbers(
   }
   return map;
 }
-
-export type AppointmentDTO = {
-  id: string;
-  startsAt: string;
-  endsAt: string;
-  durationMinutes: number;
-  status: AppointmentStatus;
-  notes: string | null;
-  seriesId: string | null;
-  rescheduledFrom: { id: string; startsAt: string } | null;
-  patient: { id: string; name: string; phone: string | null; notes: string | null };
-  package: {
-    id: string;
-    label: string | null;
-    totalSessions: number;
-    priceCents: number;
-    consumidas: number;
-    reservadas: number;
-    disponiveis: number;
-  } | null;
-  sessionNumber: number | null;
-};
 
 function toDTO(
   appt: Appointment,

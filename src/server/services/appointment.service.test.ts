@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
+import { localDayRange, toUtc } from "@/lib/time";
 import {
   cancelAppointment,
   completeAppointment,
   createAppointment,
   getAppointmentDTO,
+  listAppointments,
   rescheduleAppointment,
 } from "./appointment.service";
 
@@ -131,5 +133,18 @@ describe("appointment.service", () => {
     const canceled = await cancelAppointment(appt.id, { mode: "FREE" });
     expect(canceled.status).toBe("CANCELED_FREE");
     expect(canceled.package?.disponiveis).toBe(5);
+  });
+
+  it("armadilha 8 — atendimento às 21:00 local aparece na listagem do dia certo", async () => {
+    // Dia isolado (não usado em nenhum outro teste), bem no futuro.
+    const localDay = new Date(2032, 8, 15); // 15/set/2032 — calendário local, ver lib/time.ts
+    const startsAt = toUtc(new Date(2032, 8, 15, 21, 0, 0, 0)); // 21:00 em America/Cuiaba
+
+    const created = await createAppointment({ patientId, startsAt, durationMinutes: 30 });
+
+    const { from, to } = localDayRange(localDay);
+    const results = await listAppointments({ from, to });
+
+    expect(results.some((a) => a.id === created.id)).toBe(true);
   });
 });
