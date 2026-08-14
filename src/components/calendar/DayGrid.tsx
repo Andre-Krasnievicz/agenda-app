@@ -99,6 +99,25 @@ export function DayGrid({
 
           <NowIndicator isToday={isToday} gridStartHour={startHour} hourHeight={hourHeight} />
 
+          {items.length === 0 && (
+            <div className="pointer-events-none absolute inset-x-0 top-1/3 flex flex-col items-center gap-2 px-4 text-center">
+              <p className="text-sm text-ink-muted">Nenhum atendimento neste dia.</p>
+              {onSlotClick && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const local = new Date(localDay);
+                    local.setHours(8, 0, 0, 0);
+                    onSlotClick(toUtc(local));
+                  }}
+                  className="pointer-events-auto text-sm font-medium text-primary underline underline-offset-4"
+                >
+                  Agendar às 08:00
+                </button>
+              )}
+            </div>
+          )}
+
           {canceledItems.map(({ appointment, startMinutes }) => {
             const pos = computeBlockPosition(startMinutes, appointment.durationMinutes, {
               gridStartHour: startHour,

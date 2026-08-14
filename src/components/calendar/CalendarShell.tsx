@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { addDays, addWeeks, format, startOfWeek } from "date-fns";
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { CalendarHeader } from "./CalendarHeader";
 import { DayGrid } from "./DayGrid";
 import { WeekGrid } from "./WeekGrid";
@@ -55,6 +56,8 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
   );
 
   const weekStart = useMemo(() => startOfWeek(selected, { weekStartsOn: WEEK_STARTS_ON }), [selected]);
+  const isCurrentPeriod =
+    view === "week" ? isSameLocalDay(weekStart, startOfWeek(today, { weekStartsOn: WEEK_STARTS_ON })) : isSameLocalDay(selected, today);
   const range = useMemo(
     () => (view === "week" ? localWeekRange(selected) : localDayRange(selected)),
     [selected, view],
@@ -71,22 +74,69 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
   }
 
   const detailsAppointment = appointments?.find((a) => a.id === detailsId) ?? null;
+  const anyDialogOpen = formOpen || detailsId !== null;
+
+  // Atalhos de teclado (seção 7.5) — Esc já é tratado pelo próprio Radix Dialog.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (anyDialogOpen) return;
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (isTyping || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      switch (e.key.toLowerCase()) {
+        case "t":
+          navigate(today);
+          break;
+        case "arrowleft":
+          navigate(view === "week" ? addWeeks(selected, -1) : addDays(selected, -1));
+          break;
+        case "arrowright":
+          navigate(view === "week" ? addWeeks(selected, 1) : addDays(selected, 1));
+          break;
+        case "d":
+          if (isDesktop) navigate(selected, "day");
+          break;
+        case "s":
+          if (isDesktop) navigate(selected, "week");
+          break;
+        case "n":
+          openNewAppointment();
+          break;
+        default:
+          return;
+      }
+      e.preventDefault();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [anyDialogOpen, navigate, today, selected, view, isDesktop]);
 
   return (
     <div className="flex h-[calc(100vh-0px)] flex-col bg-bg">
       <CalendarHeader
         date={selected}
         view={view}
+        isCurrentPeriod={isCurrentPeriod}
         onViewChange={isDesktop ? (v) => navigate(selected, v) : undefined}
         onPrev={() => navigate(view === "week" ? addWeeks(selected, -1) : addDays(selected, -1))}
         onNext={() => navigate(view === "week" ? addWeeks(selected, 1) : addDays(selected, 1))}
         onToday={() => navigate(today)}
         rightSlot={
           rightSlot ?? (
-            <Button size="sm" onClick={() => openNewAppointment()}>
-              <Plus className="size-4" />
-              Novo agendamento
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" asChild aria-label="Pacientes">
+                <Link href="/pacientes">
+                  <Users className="size-4" />
+                </Link>
+              </Button>
+              <Button size="sm" onClick={() => openNewAppointment()}>
+                <Plus className="size-4" />
+                Novo agendamento
+              </Button>
+            </div>
           )
         }
       />

@@ -16,6 +16,7 @@ export function CalendarHeader({
   view,
   onViewChange,
   rightSlot,
+  isCurrentPeriod = false,
 }: {
   date: Date;
   onPrev: () => void;
@@ -24,6 +25,8 @@ export function CalendarHeader({
   view: View;
   onViewChange?: (view: View) => void;
   rightSlot?: React.ReactNode;
+  /** Se o período exibido (dia ou semana) contém hoje — destaca o botão "Hoje" (critério de aceite). */
+  isCurrentPeriod?: boolean;
 }) {
   const raw = format(date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
   // Sentence case (seção 8.2) — só a primeira letra maiúscula, nunca Title Case.
@@ -38,12 +41,21 @@ export function CalendarHeader({
         <Button variant="ghost" size="icon" onClick={onNext} aria-label="Próximo">
           <ChevronRight className="size-4" />
         </Button>
-        <Button variant="outline" size="sm" onClick={onToday} className="ml-1">
+        <Button
+          variant={isCurrentPeriod ? "secondary" : "outline"}
+          size="sm"
+          onClick={onToday}
+          disabled={isCurrentPeriod}
+          className="ml-1"
+        >
           Hoje
         </Button>
       </div>
 
-      <h1 className="font-heading text-base font-semibold text-ink sm:text-lg">{label}</h1>
+      <h1 className="flex items-center gap-2 font-heading text-base font-semibold text-ink sm:text-lg">
+        {label}
+        {isCurrentPeriod && <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />}
+      </h1>
 
       {onViewChange && (
         <div className="ml-auto hidden items-center gap-1 rounded-md border border-line bg-bg p-0.5 sm:flex">

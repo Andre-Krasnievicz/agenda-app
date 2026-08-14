@@ -1,0 +1,12 @@
+"use client";
+
+export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg text-center">
+      <p className="text-ink-muted">Algo deu errado.</p>
+      <button onClick={reset} className="text-sm font-medium text-primary underline underline-offset-4">
+        Tentar de novo
+      </button>
+    </div>
+  );
+}
