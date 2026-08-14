@@ -8,6 +8,7 @@ import { CalendarHeader } from "./CalendarHeader";
 import { DayGrid } from "./DayGrid";
 import { Button } from "@/components/ui/button";
 import { AppointmentFormDialog } from "@/components/appointment/AppointmentFormDialog";
+import { AppointmentDetailsDialog } from "@/components/appointment/AppointmentDetailsDialog";
 import { useAppointmentsQuery } from "@/hooks/use-appointments";
 import { localDayRange, todayLocal } from "@/lib/time";
 
@@ -47,11 +48,14 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
 
   const [formOpen, setFormOpen] = useState(false);
   const [slotStartsAt, setSlotStartsAt] = useState<Date | undefined>(undefined);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
 
   function openNewAppointment(startsAt?: Date) {
     setSlotStartsAt(startsAt);
     setFormOpen(true);
   }
+
+  const detailsAppointment = appointments?.find((a) => a.id === detailsId) ?? null;
 
   return (
     <div className="flex h-[calc(100vh-0px)] flex-col bg-bg">
@@ -86,6 +90,7 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
           appointments={appointments ?? []}
           isToday={isSameLocalDay(selected, today)}
           onSlotClick={openNewAppointment}
+          onAppointmentClick={setDetailsId}
         />
       )}
 
@@ -94,6 +99,14 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
         onOpenChange={setFormOpen}
         initialStartsAt={slotStartsAt}
         defaultLocalDay={selected}
+      />
+
+      <AppointmentDetailsDialog
+        appointment={detailsAppointment}
+        open={detailsId !== null}
+        onOpenChange={(v) => {
+          if (!v) setDetailsId(null);
+        }}
       />
     </div>
   );

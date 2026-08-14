@@ -6,9 +6,15 @@ import type { CreatePackageInput, UpdatePackageInput } from "@/server/validation
 // Sem `disponiveis` aqui de propósito: esse número depende de `totalSessions`,
 // que só o Package conhece. Calculá-lo neste tipo já convidou a um bug (ver
 // git blame) — quem quiser o pacote completo usa `withDisponiveis`/`attachCounters`.
+// `completed`/`canceledCounted` são o detalhamento de `consumidas` (soma dos
+// dois) — existem só para o PackageProgress (seção 8.3) distinguir visualmente
+// "realizada" de "cancelada e contada"; o contrato da API (seção 5) continua
+// expondo apenas consumidas/reservadas/disponiveis.
 export type PackageCounters = {
   consumidas: number;
   reservadas: number;
+  completed: number;
+  canceledCounted: number;
 };
 
 export type PackageWithCounters = Package & PackageCounters & { disponiveis: number };
@@ -21,15 +27,12 @@ export async function getPackageCounters(
   packageId: string,
   tx: Prisma.TransactionClient | typeof prisma = prisma,
 ): Promise<PackageCounters> {
-  const [consumidas, reservadas] = await Promise.all([
-    tx.appointment.count({
-      where: { packageId, status: { in: ["COMPLETED", "CANCELED_COUNTED"] } },
-    }),
-    tx.appointment.count({
-      where: { packageId, status: "SCHEDULED" },
-    }),
+  const [completed, canceledCounted, reservadas] = await Promise.all([
+    tx.appointment.count({ where: { packageId, status: "COMPLETED" } }),
+    tx.appointment.count({ where: { packageId, status: "CANCELED_COUNTED" } }),
+    tx.appointment.count({ where: { packageId, status: "SCHEDULED" } }),
   ]);
-  return { consumidas, reservadas };
+  return { consumidas: completed + canceledCounted, reservadas, completed, canceledCounted };
 }
 
 export function withDisponiveis(pkg: Package, counters: PackageCounters): PackageWithCounters {

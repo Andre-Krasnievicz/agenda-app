@@ -17,6 +17,8 @@ export type PackageDTO = {
   consumidas: number;
   reservadas: number;
   disponiveis: number;
+  completed?: number;
+  canceledCounted?: number;
 };
 
 export type PatientDTO = {
@@ -38,14 +40,6 @@ export type AppointmentDTO = {
   seriesId: string | null;
   rescheduledFrom: { id: string; startsAt: string } | null;
   patient: { id: string; name: string; phone: string | null; notes: string | null };
-  package: {
-    id: string;
-    label: string | null;
-    totalSessions: number;
-    priceCents: number;
-    consumidas: number;
-    reservadas: number;
-    disponiveis: number;
-  } | null;
+  package: PackageDTO | null;
   sessionNumber: number | null;
 };

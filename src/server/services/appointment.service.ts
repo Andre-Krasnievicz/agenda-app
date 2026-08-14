@@ -141,6 +141,8 @@ function toDTO(
             priceCents: pkg.priceCents,
             consumidas: counters.consumidas,
             reservadas: counters.reservadas,
+            completed: counters.completed,
+            canceledCounted: counters.canceledCounted,
             // getPackageCounters devolve um `disponiveis` placeholder — o real
             // depende de totalSessions, que só o pacote (não o contador) conhece.
             disponiveis: pkg.totalSessions - counters.consumidas - counters.reservadas,

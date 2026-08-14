@@ -25,9 +25,9 @@ import { localDateTimeToUtc, toLocalHHmm } from "@/lib/time";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { usePatientPackagesQuery, useCreatePackageMutation } from "@/hooks/use-patients";
-import { useCreateAppointmentMutation } from "@/hooks/use-appointment-mutations";
+import { useCreateAppointmentMutation, useUpdateAppointmentMutation } from "@/hooks/use-appointment-mutations";
 import { ApiClientError } from "@/lib/api-client";
-import type { PatientDTO } from "@/lib/types";
+import type { AppointmentDTO, PatientDTO } from "@/lib/types";
 
 const formSchema = z.object({
   date: z.string().min(1, "Selecione a data."),
@@ -44,6 +44,7 @@ export function AppointmentFormDialog({
   onOpenChange,
   initialStartsAt,
   defaultLocalDay,
+  editingAppointment,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,6 +52,8 @@ export function AppointmentFormDialog({
   initialStartsAt?: Date;
   /** Dia local pré-preenchido (só a data), quando aberto pelo botão "Novo agendamento". */
   defaultLocalDay?: Date;
+  /** Quando presente, o diálogo abre em modo edição (PATCH) em vez de criação. */
+  editingAppointment?: AppointmentDTO;
 }) {
   // "Adjusting state when a prop changes" (https://react.dev/learn/you-might-not-need-an-effect) —
   // calculado durante o render, não em efeito: a cada transição fechado->aberto, o formKey muda e
@@ -66,13 +69,18 @@ export function AppointmentFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Novo agendamento</DialogTitle>
-          <DialogDescription>Marque uma sessão para uma paciente já cadastrada ou cadastre agora.</DialogDescription>
+          <DialogTitle>{editingAppointment ? "Editar agendamento" : "Novo agendamento"}</DialogTitle>
+          <DialogDescription>
+            {editingAppointment
+              ? "Ajuste data, horário, duração ou observações."
+              : "Marque uma sessão para uma paciente já cadastrada ou cadastre agora."}
+          </DialogDescription>
         </DialogHeader>
         <AppointmentFormBody
           key={formKey}
           initialStartsAt={initialStartsAt}
           defaultLocalDay={defaultLocalDay}
+          editingAppointment={editingAppointment}
           onDone={() => onOpenChange(false)}
         />
       </DialogContent>
@@ -83,10 +91,12 @@ export function AppointmentFormDialog({
 function AppointmentFormBody({
   initialStartsAt,
   defaultLocalDay,
+  editingAppointment,
   onDone,
 }: {
   initialStartsAt?: Date;
   defaultLocalDay?: Date;
+  editingAppointment?: AppointmentDTO;
   onDone: () => void;
 }) {
   const [selectedPatient, setSelectedPatient] = useState<PatientDTO | null>(null);
@@ -97,6 +107,8 @@ function AppointmentFormBody({
   const [newPackageSessions, setNewPackageSessions] = useState("10");
   const [newPackagePrice, setNewPackagePrice] = useState("");
 
+  const editStart = editingAppointment ? new Date(editingAppointment.startsAt) : undefined;
+
   const {
     register,
     handleSubmit,
@@ -105,15 +117,20 @@ function AppointmentFormBody({
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: format(initialStartsAt ?? defaultLocalDay ?? new Date(), "yyyy-MM-dd"),
-      time: initialStartsAt ? toLocalHHmm(initialStartsAt.toISOString()) : "",
-      durationMinutes: DEFAULT_DURATION_MINUTES,
-      notes: "",
+      date: format(editStart ?? initialStartsAt ?? defaultLocalDay ?? new Date(), "yyyy-MM-dd"),
+      time: editStart
+        ? toLocalHHmm(editStart.toISOString())
+        : initialStartsAt
+          ? toLocalHHmm(initialStartsAt.toISOString())
+          : "",
+      durationMinutes: editingAppointment?.durationMinutes ?? DEFAULT_DURATION_MINUTES,
+      notes: editingAppointment?.notes ?? "",
     },
   });
 
   const packagesQuery = usePatientPackagesQuery(selectedPatient?.id ?? null);
   const createAppointment = useCreateAppointmentMutation();
+  const updateAppointment = useUpdateAppointmentMutation();
   const createPackage = useCreatePackageMutation(selectedPatient?.id ?? null);
 
   const activePackages = (packagesQuery.data ?? []).filter((p) => p.status !== "CANCELED");
@@ -135,11 +152,39 @@ function AppointmentFormBody({
       : activePackages;
 
   function submit(values: FormValues, allowOverlap = false) {
+    const startsAt = localDateTimeToUtc(new Date(`${values.date}T00:00:00`), values.time);
+
+    if (editingAppointment) {
+      updateAppointment.mutate(
+        {
+          id: editingAppointment.id,
+          startsAt: startsAt.toISOString(),
+          durationMinutes: values.durationMinutes,
+          notes: values.notes || null,
+        },
+        {
+          onSuccess: () => {
+            toast.success("Agendamento atualizado.");
+            onDone();
+          },
+          onError: (err) => {
+            if (err instanceof ApiClientError && err.code === "SLOT_CONFLICT") {
+              const details = err.details as { conflict?: { patientName: string; startsAt: string; endsAt: string } };
+              if (details?.conflict) setConflict(details.conflict);
+              else toast.error(err.message);
+              return;
+            }
+            toast.error(err instanceof ApiClientError ? err.message : "Não foi possível salvar as alterações.");
+          },
+        },
+      );
+      return;
+    }
+
     if (!selectedPatient) {
       toast.error("Selecione um paciente.");
       return;
     }
-    const startsAt = localDateTimeToUtc(new Date(`${values.date}T00:00:00`), values.time);
     createAppointment.mutate(
       {
         patientId: selectedPatient.id,
@@ -200,7 +245,18 @@ function AppointmentFormBody({
     <form onSubmit={handleSubmit((v) => submit(v))} className="space-y-4">
       <div className="space-y-1.5">
         <Label>Paciente</Label>
-        {creatingPatientName !== null ? (
+        {editingAppointment ? (
+          <p className="rounded-md border border-line bg-bg px-3 py-2 text-sm text-ink">
+            {editingAppointment.patient.name}
+            {editingAppointment.package && (
+              <span className="ml-1 text-ink-muted">
+                · {editingAppointment.package.label ?? "Pacote"} ({editingAppointment.package.consumidas +
+                  editingAppointment.package.reservadas}{" "}
+                de {editingAppointment.package.totalSessions})
+              </span>
+            )}
+          </p>
+        ) : creatingPatientName !== null ? (
           <NewPatientInlineForm
             initialName={creatingPatientName}
             onCreated={(patient) => {
@@ -214,7 +270,7 @@ function AppointmentFormBody({
         )}
       </div>
 
-      {selectedPatient && (
+      {!editingAppointment && selectedPatient && (
         <div className="space-y-1.5">
           <Label>Pacote</Label>
           <Select
@@ -334,8 +390,17 @@ function AppointmentFormBody({
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={createAppointment.isPending || !selectedPatient}>
-          {createAppointment.isPending ? "Salvando…" : "Agendar"}
+        <Button
+          type="submit"
+          disabled={editingAppointment ? updateAppointment.isPending : createAppointment.isPending || !selectedPatient}
+        >
+          {editingAppointment
+            ? updateAppointment.isPending
+              ? "Salvando…"
+              : "Salvar alterações"
+            : createAppointment.isPending
+              ? "Salvando…"
+              : "Agendar"}
         </Button>
       </DialogFooter>
     </form>
