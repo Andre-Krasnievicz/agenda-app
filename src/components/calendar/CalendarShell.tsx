@@ -140,7 +140,14 @@ export function CalendarShell({ rightSlot }: { rightSlot?: React.ReactNode }) {
           )
         }
       />
-      {isError ? (
+      {/*
+       * Só bloqueia a tela com a mensagem de erro quando não há NENHUM dado em cache
+       * para mostrar (ex.: primeiro carregamento falhou). Um refetch em segundo plano
+       * que falha (foco na janela, reconexão, etc.) marca `isError` mesmo com dados
+       * antigos ainda válidos — nesse caso o toast global (ver providers.tsx) já avisa,
+       * e a agenda continua na tela em vez de "piscar" a cada soluço de rede.
+       */}
+      {isError && appointments === undefined ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p className="text-ink-muted">Não foi possível carregar a agenda.</p>
           <button onClick={() => refetch()} className="text-sm font-medium text-primary underline underline-offset-4">
